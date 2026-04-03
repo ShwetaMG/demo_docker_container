@@ -1,0 +1,70 @@
+
+######################################################
+# using the muultistage method
+#####################################################
+
+# STAGE 1: Build Stage
+FROM python:3.12-slim AS builder
+
+# Set environment variables to prevent Python from writing pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+# Install system dependencies needed for building (e.g., for psycopg2 or pillow)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies into a specific folder
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# STAGE 2: Final Runtime Stage
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy ONLY the installed packages from the builder stage
+COPY --from=builder /install /usr/local
+
+# Copy your Django project code
+COPY . .
+
+# Expose port and run server
+EXPOSE 8000
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+
+
+
+
+
+###################################################
+
+# creating image  without using the multistage method.
+
+##################################################
+# 1. Use an official Python image as the base
+#FROM python:3.12-slim
+
+# 2. Set the directory inside the container where our code will live
+#WORKDIR /app
+
+# 3. Copy the requirements file from your laptop into the container
+#COPY requirements.txt .
+
+# 4. Install the libraries listed in requirements.txt
+#RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. Copy the rest of your Django project code into the container
+#COPY . .
+
+# 6. Tell Docker that the container will listen on port 8000
+#EXPOSE 8000
+
+# 7. The command to start your Django app when the container launches
+#CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

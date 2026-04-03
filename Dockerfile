@@ -1,20 +1,32 @@
-# 1. Use an official Python image as the base
-FROM python:3.12-slim
-
-# 2. Set the directory inside the container where our code will live
+# STAGE 1: The Builder (Standard image)
+FROM python:3.12-slim AS builder
 WORKDIR /app
 
-# 3. Copy the requirements file from your laptop into the container
+# Prevent python from buffering and writing pyc files
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
 COPY requirements.txt .
-
-# 4. Install the libraries listed in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 5. Copy the rest of your Django project code into the container
+# Install to a specific prefix. 
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 COPY . .
 
-# 6. Tell Docker that the container will listen on port 8000
+# STAGE 2: The Final Stage (Distroless)
+# Using the Debian 12 version which supports Python 3.12
+FROM gcr.io/distroless/python3-debian12
+WORKDIR /app
+
+# Copy the libraries from the builder stage
+COPY --from=builder /install/lib/python3.12/site-packages /usr/lib/python3/dist-packages
+
+# Copy your Django project code
+COPY --from=builder /app /app
+
+# Set environment variables
+ENV PYTHONPATH=/usr/lib/python3/dist-packages
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8000
 
-# 7. The command to start your Django app when the container launches
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Exec form entrypoint
+ENTRYPOINT ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
